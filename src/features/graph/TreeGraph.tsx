@@ -10,7 +10,7 @@ import {
   type NodeProps,
   type NodeTypes,
 } from '@xyflow/react'
-import type { TreeBranch, TreeNode } from './model'
+import type { TreeBranch, TreeNode } from '../../domain/model'
 import './TreeGraph.css'
 
 type GraphNodeData = {

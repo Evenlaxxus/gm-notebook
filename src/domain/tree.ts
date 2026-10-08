@@ -23,6 +23,18 @@ export function findParentBranch(branch: TreeBranch, id: string): TreeBranch | u
   return undefined
 }
 
+export function findBranchPath(branch: TreeBranch, id: string, path: TreeBranch[] = []): TreeBranch[] | undefined {
+  const nextPath = [...path, branch]
+  for (const child of branch.children) {
+    if (child.id === id) return nextPath
+    if (child.type === 'branch') {
+      const found = findBranchPath(child, id, nextPath)
+      if (found) return found
+    }
+  }
+  return undefined
+}
+
 export function findFirstLeaf(branch: TreeBranch): TreeLeaf | undefined {
   for (const child of branch.children) {
     if (child.type === 'leaf') return child

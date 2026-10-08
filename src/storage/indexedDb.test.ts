@@ -1,7 +1,7 @@
 import { Blob as NodeBlob } from 'node:buffer'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { Notebook } from './model'
-import { deleteNotebook, loadNotebook, saveNotebook } from './storage'
+import type { Notebook } from '../domain/model'
+import { deleteNotebook, loadNotebook, saveNotebook } from './indexedDb'
 
 function createNotebook(): Notebook {
   return {

@@ -1,4 +1,4 @@
-import type { Notebook, Note, NoteBlock, TreeNode } from './model'
+import type { Notebook, Note, NoteBlock, TreeNode } from '../domain/model'
 
 const DATABASE_NAME = 'gm-notebook'
 const DATABASE_VERSION = 1

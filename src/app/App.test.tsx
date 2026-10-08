@@ -2,18 +2,18 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { TreeBranch, TreeLeaf, TreeNode } from './model'
-import { deleteNotebook, loadNotebook } from './storage'
+import type { TreeBranch, TreeLeaf, TreeNode } from '../domain/model'
+import { deleteNotebook, loadNotebook } from '../storage/indexedDb'
 
-vi.mock('./TreeGraph', async () => {
-  const { createElement } = await import('react')
+vi.mock('../features/graph/TreeGraph', async () => {
+  const { createElement, type ReactNode } = await import('react')
   return {
     default: ({ tree, onSelectLeaf, onToggleBranch }: {
       tree: TreeBranch
       onSelectLeaf: (id: string) => void
       onToggleBranch: (id: string) => void
     }) => {
-      function renderNode(node: TreeNode) {
+      function renderNode(node: TreeNode): ReactNode {
         if (node.type === 'leaf') {
           return createElement('button', { key: node.id, onClick: () => onSelectLeaf(node.id) }, node.name)
         }
