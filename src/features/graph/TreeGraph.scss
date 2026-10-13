@@ -1,0 +1,217 @@
+@use '../../styles/tokens' as tokens;
+
+.react-flow__node-notebookNode {
+  width: 226px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.tree-graph {
+  .react-flow__pane {
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  .react-flow__handle {
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-handle);
+  }
+
+  .react-flow__controls {
+    overflow: hidden;
+    border: 1px solid var(--color-border-soft);
+    border-radius: 6px;
+    box-shadow: var(--shadow-control);
+  }
+
+  .react-flow__controls-button {
+    width: 30px;
+    height: 30px;
+    border-bottom-color: var(--color-border-soft);
+    background: var(--color-node-control);
+    fill: var(--color-text-strong);
+
+    &:hover {
+      background: var(--color-node-control-hover);
+    }
+  }
+
+  .react-flow__attribution {
+    color: var(--color-text-strong);
+    background: var(--color-attribution);
+  }
+
+  .react-flow__background {
+    background: transparent;
+  }
+
+  .react-flow__edge-path {
+    stroke: var(--color-graph-edge);
+  }
+
+  .react-flow__edge.selected .react-flow__edge-path,
+  .react-flow__edge:focus .react-flow__edge-path {
+    stroke: var(--color-accent);
+  }
+
+  .react-flow__node:focus-visible {
+    outline: 2px solid var(--color-accent);
+  }
+
+  &__node {
+    min-height: 54px;
+    border: 1px solid var(--color-border-medium);
+    border-radius: 10px;
+    background: var(--color-node-surface);
+    box-shadow: var(--shadow-node);
+    transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+
+    &:hover {
+      transform: translateY(-1px);
+      border-color: var(--color-accent-strong);
+      box-shadow: var(--shadow-node-hover);
+    }
+
+    &--active {
+      border-color: var(--color-accent-strong);
+      box-shadow: 0 0 0 2px var(--color-accent-focus), var(--shadow-node-active);
+    }
+
+    &:hover .tree-graph__node-actions,
+    &:focus-within .tree-graph__node-actions {
+      opacity: 1;
+    }
+  }
+
+  &__node-content {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+  }
+
+  &__node-button {
+    width: 0;
+    flex: 1;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: inherit;
+    color: var(--color-text);
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-accent-strong);
+      outline-offset: 2px;
+    }
+  }
+
+  &__node-icon {
+    width: 22px;
+    flex: 0 0 auto;
+    color: var(--color-warning);
+    font-size: 16px;
+    text-align: center;
+  }
+
+  &__node-label {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    color: var(--color-text);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+  }
+
+  &__node-count,
+  &__node-open {
+    flex: 0 0 auto;
+    color: var(--color-text-soft);
+    font-size: 10px;
+  }
+
+  &__node-open {
+    font-size: 13px;
+  }
+
+  &__node-toggle {
+    flex: 0 0 auto;
+    min-width: 38px;
+    padding: 0 6px;
+    border: 0;
+    border-left: 1px solid var(--color-border-soft);
+    border-radius: 0 9px 9px 0;
+    color: var(--color-text-soft);
+    background: transparent;
+    font: inherit;
+    font-size: 10px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--color-text);
+      background: var(--color-control-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-accent-strong);
+      outline-offset: 2px;
+    }
+  }
+
+  &__node-actions {
+    position: absolute;
+    z-index: 1;
+    top: -10px;
+    right: -8px;
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    background: var(--color-surface-raised);
+    box-shadow: 0 2px 6px var(--shadow-color);
+    opacity: 0;
+    transition: opacity 120ms ease;
+
+    button {
+      width: 22px;
+      height: 21px;
+      padding: 0;
+      border: 0;
+      border-radius: 3px;
+      color: var(--color-text-soft);
+      background: transparent;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--color-text);
+        background: var(--color-control-hover);
+      }
+
+      &:last-child {
+        color: var(--color-danger);
+      }
+    }
+  }
+}
+
+@media (max-width: tokens.$breakpoint-mobile) {
+  .tree-graph__node-actions {
+    opacity: 1;
+  }
+}

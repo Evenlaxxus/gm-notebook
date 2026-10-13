@@ -1,0 +1,288 @@
+@use '../../styles/tokens' as tokens;
+
+.note-editor {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 34px 36px 60px;
+  color: var(--color-text);
+  background: var(--color-surface-graph);
+
+  &__kicker {
+    color: var(--color-text-soft);
+  }
+
+  &__title {
+    color: var(--color-text);
+    font-size: 32px;
+  }
+
+  &__metadata {
+    color: var(--color-text-soft);
+  }
+
+  &__divider {
+    height: 1px;
+    border: 0;
+    background: var(--color-border);
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    margin: 20px 0 8px;
+
+    > button {
+      min-height: 30px;
+      padding: 0 10px;
+      border: 1px solid var(--color-border-soft);
+      border-radius: 6px;
+      color: var(--color-text);
+      background: var(--color-control);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--color-accent-hover);
+      }
+    }
+
+    > span {
+      margin-left: auto;
+      color: var(--color-text-soft);
+      font-size: 10px;
+    }
+  }
+
+  &__file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  &__canvas {
+    position: relative;
+    width: 100%;
+    min-height: 820px;
+  }
+
+  &__block {
+    position: absolute;
+    z-index: 1;
+    max-width: 100%;
+
+    &--text {
+      min-width: 180px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      cursor: grab;
+
+      &:hover {
+        border-color: var(--color-border-soft);
+      }
+
+      &:focus-within {
+        border-color: var(--color-accent-strong);
+        box-shadow: 0 0 0 2px var(--color-accent-focus);
+      }
+
+      &:active {
+        cursor: grabbing;
+      }
+
+      .note-editor__textarea {
+        cursor: text;
+      }
+
+      .note-editor__block-remove {
+        position: absolute;
+        z-index: 2;
+        top: 3px;
+        right: 3px;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      &:hover .note-editor__block-remove,
+      &:focus-within .note-editor__block-remove {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+    }
+
+    &--image {
+      cursor: grab;
+      padding: 4px;
+      border: 1px solid var(--color-border-soft);
+      border-radius: 5px;
+      background: var(--color-surface-soft);
+      box-shadow: var(--shadow-image);
+
+      &:active {
+        cursor: grabbing;
+      }
+
+      .note-editor__block-remove {
+        position: absolute;
+        z-index: 2;
+        top: 6px;
+        right: 6px;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      &:hover .note-editor__block-remove,
+      &:focus-within .note-editor__block-remove {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+
+      .note-editor__image-resize {
+        position: absolute;
+        z-index: 2;
+        right: 2px;
+        bottom: 2px;
+        width: 20px;
+        height: 20px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: nwse-resize;
+        touch-action: none;
+
+        &::after {
+          width: 11px;
+          height: 11px;
+          background: repeating-linear-gradient(135deg, transparent 0 3px, var(--color-text-soft) 3px 4px, transparent 4px 6px);
+          content: '';
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--color-accent-strong);
+          outline-offset: 1px;
+        }
+      }
+    }
+  }
+
+  &__block-remove {
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--color-danger-soft);
+    background: transparent;
+    font: 13px/1 var(--font-family);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--color-danger);
+      background: transparent;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-accent-strong);
+      outline-offset: 2px;
+    }
+  }
+
+  &__textarea {
+    width: 100%;
+    min-height: 106px;
+    display: block;
+    padding: 10px 11px;
+    border: 1px solid transparent;
+    border-radius: 0 0 5px 5px;
+    outline: 0;
+    color: var(--color-text);
+    background: var(--color-control);
+    font: 13px/1.8 var(--font-family);
+    resize: vertical;
+
+    &:hover {
+      border-color: var(--color-border-soft);
+    }
+
+    &:focus {
+      border-color: var(--color-accent-strong);
+      background: var(--color-control-focus);
+      box-shadow: 0 0 0 2px var(--color-accent-focus);
+    }
+  }
+
+  &__figure {
+    margin: 0;
+  }
+
+  &__image {
+    width: 100%;
+    height: auto;
+    max-height: 440px;
+    display: block;
+    object-fit: contain;
+  }
+
+  &__caption {
+    padding: 5px 3px 1px;
+    color: var(--color-text-caption);
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  &__empty {
+    padding: 40px 12px;
+    color: var(--color-text-soft);
+    font-size: 12px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .note-editor {
+    padding-inline: 25px;
+  }
+}
+
+@media (max-width: tokens.$breakpoint-mobile) {
+  .note-editor {
+    padding: 28px 20px 45px;
+
+    &__title {
+      font-size: 29px;
+    }
+
+    &__block {
+      min-width: 0;
+    }
+
+    &__block--text .note-editor__block-remove {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    &__block--image .note-editor__block-remove {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+  }
+}

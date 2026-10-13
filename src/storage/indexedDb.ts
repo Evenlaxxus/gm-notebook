@@ -1,4 +1,5 @@
 import type { Notebook, Note, NoteBlock, TreeNode } from '../domain/model'
+import { createId } from '../domain/ids'
 
 const DATABASE_NAME = 'gm-notebook'
 const DATABASE_VERSION = 1
@@ -121,17 +122,58 @@ function isValidNode(value: unknown, ids: Set<string>, depth: number, count: { v
   ids.add(value.id)
   count.value += 1
 
-  if (value.type === 'branch') {
+  if (value.type === 'branch' && value.note === undefined) {
     return Array.isArray(value.children)
       && value.children.every((child) => isValidNode(child, ids, depth + 1, count))
   }
-  return value.type === 'leaf' && isValidNote(value.note, ids)
+  if (value.type === 'leaf' && value.children === undefined) {
+    return isValidNote(value.note, ids)
+  }
+  return isValidNote(value.note, ids)
+    && Array.isArray(value.children)
+    && value.children.every((child) => isValidNode(child, ids, depth + 1, count))
 }
 
 function isValidNotebook(value: unknown): value is Notebook {
-  if (!isRecord(value) || !isValidId(value.id) || !isRecord(value.root) || value.root.type !== 'branch') return false
+  if (!isRecord(value) || !isValidId(value.id) || !isRecord(value.root)) return false
   const ids = new Set<string>()
   return isValidNode(value.root, ids, 0, { value: 0 })
+}
+
+function collectIds(value: unknown, ids: Set<string>) {
+  if (!isRecord(value)) return
+  ids.add(value.id as string)
+  if (isRecord(value.note)) {
+    ids.add(value.note.id as string)
+    if (Array.isArray(value.note.blocks)) {
+      for (const block of value.note.blocks) {
+        if (isRecord(block)) ids.add(block.id as string)
+      }
+    }
+  }
+  if (Array.isArray(value.children)) {
+    for (const child of value.children) {
+      if (isRecord(child)) collectIds(child, ids)
+    }
+  }
+}
+
+function normalizeNode(value: unknown, ids: Set<string>): TreeNode {
+  if (!isRecord(value)) throw new Error('Stored notebook data is invalid.')
+  let note = value.note as Note | undefined
+  if (!note) {
+    let noteId = createId()
+    while (ids.has(noteId)) noteId = createId()
+    ids.add(noteId)
+    note = { id: noteId, updatedAt: new Date().toISOString(), blocks: [] }
+  }
+  const children = (value.children as unknown[] | undefined) ?? []
+  return {
+    id: value.id as string,
+    name: value.name as string,
+    note,
+    children: children.map((child) => normalizeNode(child, ids)),
+  }
 }
 
 export async function loadNotebook(): Promise<Notebook | undefined> {
@@ -142,7 +184,9 @@ export async function loadNotebook(): Promise<Notebook | undefined> {
   const [value] = await Promise.all([request, completion])
   if (value === undefined) return undefined
   if (!isValidNotebook(value)) throw new Error('Stored notebook data is invalid.')
-  return value
+  const usedIds = new Set<string>()
+  collectIds(value.root, usedIds)
+  return { id: value.id, root: normalizeNode(value.root, usedIds) }
 }
 
 export async function saveNotebook(notebook: Notebook): Promise<void> {

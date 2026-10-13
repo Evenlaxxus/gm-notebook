@@ -1,23 +1,14 @@
 export interface Notebook {
   id: string
-  root: TreeBranch
+  root: TreeNode
 }
 
-export interface TreeBranch {
+export interface TreeNode {
   id: string
-  type: 'branch'
-  name: string
-  children: TreeNode[]
-}
-
-export interface TreeLeaf {
-  id: string
-  type: 'leaf'
   name: string
   note: Note
+  children: TreeNode[]
 }
-
-export type TreeNode = TreeBranch | TreeLeaf
 
 export interface Note {
   id: string

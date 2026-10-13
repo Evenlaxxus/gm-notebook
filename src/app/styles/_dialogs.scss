@@ -1,0 +1,90 @@
+.dialog {
+  &__backdrop {
+    position: fixed;
+    z-index: 10;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: var(--color-scrim);
+  }
+
+  &__form {
+    width: min(100%, 390px);
+    display: grid;
+    gap: 16px;
+    padding: 22px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface);
+    box-shadow: 0 18px 50px var(--shadow-color);
+  }
+
+  &__title {
+    color: var(--color-text);
+    font: 400 22px Georgia, serif;
+  }
+
+  &__copy {
+    color: var(--color-text-soft);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  &__field {
+    display: grid;
+    gap: 6px;
+    color: var(--color-text-soft);
+    font-size: 12px;
+  }
+
+  &__input {
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 9px;
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    color: var(--color-text);
+    background: var(--color-surface-soft);
+  }
+
+  &__error {
+    color: var(--color-danger);
+    font-size: 11px;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  &__button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    color: var(--color-text);
+    background: var(--color-surface-soft);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-surface-raised);
+    }
+
+    &--confirm {
+      border-color: var(--color-accent);
+      color: var(--color-accent-on);
+      background: var(--color-accent);
+    }
+
+    &--delete {
+      border-color: var(--color-danger);
+      color: var(--color-text-inverse);
+      background: var(--color-danger-surface);
+    }
+  }
+}

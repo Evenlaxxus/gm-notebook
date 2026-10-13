@@ -1,4 +1,4 @@
-import type { Note, TreeBranch } from './model'
+import type { Note, TreeNode } from './model'
 import { createId } from './ids'
 
 export function createNote(text: string): Note {
@@ -17,33 +17,33 @@ export function createNote(text: string): Note {
   }
 }
 
-export const initialTree: TreeBranch = {
+export const initialTree: TreeNode = {
   id: 'root',
-  type: 'branch',
   name: 'Notatki',
+  note: createNote(''),
   children: [
     {
       id: 'campaign',
-      type: 'branch',
       name: 'Wybrzeze Popiolow',
+      note: createNote(''),
       children: [
         {
           id: 'coast-note',
-          type: 'leaf',
           name: 'The Drowned Coast',
           note: createNote('Gdy odplyw odslania czarne skaly, na plazy pojawiaja sie drzwi. Nie maja scian ani framugi. Prowadza wprost pod powierzchnie morza, a zza nich slychac dzwon bijacy w rytmie przyplywu.\n\nMiejscowi omijaja zatoke po zmroku. Twierdza, ze morze oddaje wszystko, co zabralo, ale nigdy w tej samej postaci.'),
+          children: [],
         },
-        { id: 'port-note', type: 'leaf', name: 'Port Szeptow', note: createNote('Port budzi sie przed switem. Rybacy zostawiaja przy kei puste latarnie, by zaznaczyc miejsca, do ktorych nie nalezy cumowac.') },
-        { id: 'npcs-note', type: 'leaf', name: 'Postacie niezalezne', note: createNote('Kapitan Veyr zna droge do zatoki, ale za kazdym razem opowiada inna wersje swojej historii.') },
+        { id: 'port-note', name: 'Port Szeptow', note: createNote('Port budzi sie przed switem. Rybacy zostawiaja przy kei puste latarnie, by zaznaczyc miejsca, do ktorych nie nalezy cumowac.'), children: [] },
+        { id: 'npcs-note', name: 'Postacie niezalezne', note: createNote('Kapitan Veyr zna droge do zatoki, ale za kazdym razem opowiada inna wersje swojej historii.'), children: [] },
       ],
     },
     {
       id: 'ideas',
-      type: 'branch',
       name: 'Pomysly na sesje',
+      note: createNote(''),
       children: [
-        { id: 'lighthouse-note', type: 'leaf', name: 'Zaginiony latarnik', note: createNote('Latarnia wciaz swieci, choc od tygodnia nikt nie widzial jej straznika.') },
-        { id: 'oath-note', type: 'leaf', name: 'Cena przysiegi', note: createNote('Stara przysiega chroni miasto, ale kazdego roku wymaga nowego imienia.') },
+        { id: 'lighthouse-note', name: 'Zaginiony latarnik', note: createNote('Latarnia wciaz swieci, choc od tygodnia nikt nie widzial jej straznika.'), children: [] },
+        { id: 'oath-note', name: 'Cena przysiegi', note: createNote('Stara przysiega chroni miasto, ale kazdego roku wymaga nowego imienia.'), children: [] },
       ],
     },
   ],

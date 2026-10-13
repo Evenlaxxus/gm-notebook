@@ -1,82 +1,73 @@
-import type { ImageBlock, TreeBranch, TreeLeaf, TreeNode } from './model'
+import type { ImageBlock, TreeNode } from './model'
 
-export function findNode(branch: TreeBranch, id: string): TreeNode | undefined {
-  if (branch.id === id) return branch
-  for (const child of branch.children) {
+export function findNode(node: TreeNode, id: string): TreeNode | undefined {
+  if (node.id === id) return node
+  for (const child of node.children) {
     if (child.id === id) return child
-    if (child.type === 'branch') {
-      const found = findNode(child, id)
-      if (found) return found
-    }
-  }
-  return undefined
-}
-
-export function findParentBranch(branch: TreeBranch, id: string): TreeBranch | undefined {
-  for (const child of branch.children) {
-    if (child.id === id) return branch
-    if (child.type === 'branch') {
-      const found = findParentBranch(child, id)
-      if (found) return found
-    }
-  }
-  return undefined
-}
-
-export function findBranchPath(branch: TreeBranch, id: string, path: TreeBranch[] = []): TreeBranch[] | undefined {
-  const nextPath = [...path, branch]
-  for (const child of branch.children) {
-    if (child.id === id) return nextPath
-    if (child.type === 'branch') {
-      const found = findBranchPath(child, id, nextPath)
-      if (found) return found
-    }
-  }
-  return undefined
-}
-
-export function findFirstLeaf(branch: TreeBranch): TreeLeaf | undefined {
-  for (const child of branch.children) {
-    if (child.type === 'leaf') return child
-    const found = findFirstLeaf(child)
+    const found = findNode(child, id)
     if (found) return found
   }
   return undefined
 }
 
-export function updateNode(branch: TreeBranch, id: string, update: (node: TreeNode) => TreeNode): TreeBranch {
+export function findParentNode(node: TreeNode, id: string): TreeNode | undefined {
+  for (const child of node.children) {
+    if (child.id === id) return node
+    const found = findParentNode(child, id)
+    if (found) return found
+  }
+  return undefined
+}
+
+export function findNodePath(node: TreeNode, id: string, path: TreeNode[] = []): TreeNode[] | undefined {
+  const nextPath = [...path, node]
+  for (const child of node.children) {
+    if (child.id === id) return nextPath
+    const found = findNodePath(child, id, nextPath)
+    if (found) return found
+  }
+  return undefined
+}
+
+export function findFirstNode(node: TreeNode): TreeNode | undefined {
+  for (const child of node.children) {
+    return findFirstNode(child) ?? child
+  }
+  return undefined
+}
+
+export function updateNode(node: TreeNode, id: string, update: (node: TreeNode) => TreeNode): TreeNode {
   return {
-    ...branch,
-    children: branch.children.map((child) => {
+    ...node,
+    children: node.children.map((child) => {
       if (child.id === id) return update(child)
-      return child.type === 'branch' ? updateNode(child, id, update) : child
+      return updateNode(child, id, update)
     }),
   }
 }
 
-export function removeNode(branch: TreeBranch, id: string): TreeBranch {
+export function removeNode(node: TreeNode, id: string): TreeNode {
   return {
-    ...branch,
-    children: branch.children
+    ...node,
+    children: node.children
       .filter((child) => child.id !== id)
-      .map((child) => child.type === 'branch' ? removeNode(child, id) : child),
+      .map((child) => removeNode(child, id)),
   }
 }
 
-export function moveNode(root: TreeBranch, movingId: string, targetId: string): TreeBranch | undefined {
+export function moveNode(root: TreeNode, movingId: string, targetId: string): TreeNode | undefined {
   const moving = findNode(root, movingId)
   const target = findNode(root, targetId)
-  if (!moving || moving.id === root.id || target?.type !== 'branch' || movingId === targetId) return undefined
-  if (moving.type === 'branch' && findNode(moving, targetId)) return undefined
+  if (!moving || moving.id === root.id || !target || movingId === targetId) return undefined
+  if (findNode(moving, targetId)) return undefined
 
   const withoutMoving = removeNode(root, movingId)
-  if (targetId === root.id) return { ...withoutMoving, children: [...withoutMoving.children, moving] }
-  return updateNode(withoutMoving, targetId, (node) => node.type === 'branch'
-    ? { ...node, children: [...node.children, moving] }
-    : node)
+  return updateNode(withoutMoving, targetId, (node) => ({ ...node, children: [...node.children, moving] }))
 }
 
 export function getImagesInNode(node: TreeNode): ImageBlock[] {
-  if (node.type === 'leaf') return node.note.blocks.filter((block): block is ImageBlock => block.type === 'image')
-  return node.children.flatMap(getImagesInNode)
+  return [
+    ...node.note.blocks.filter((block): block is ImageBlock => block.type === 'image'),
+    ...node.children.flatMap(getImagesInNode),
+  ]
 }

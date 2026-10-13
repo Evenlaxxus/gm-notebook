@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react'
 import '@xyflow/react/dist/style.css'
-import type { ImageBlock, Note, NoteBlock, TextBlock, TreeBranch, TreeLeaf } from '../domain/model'
+import type { ImageBlock, Note, NoteBlock, TextBlock, TreeNode } from '../domain/model'
 import { createId as makeId } from '../domain/ids'
 import { createNote as makeNote, initialTree } from '../domain/initialTree'
-import { findBranchPath, findFirstLeaf, findNode, findParentBranch, getImagesInNode, removeNode, updateNode } from '../domain/tree'
+import { findFirstNode, findNode, findNodePath, findParentNode, getImagesInNode, removeNode, updateNode } from '../domain/tree'
 import { deleteNotebook, loadNotebook, saveNotebook } from '../storage/indexedDb'
 import NoteEditor from '../features/editor/NoteEditor'
 import TreeGraph from '../features/graph/TreeGraph'
-import './App.css'
+import './App.scss'
 
 type DialogState = {
-  kind: 'branch' | 'note' | 'rename' | 'delete'
+  kind: 'node' | 'rename' | 'delete'
   parentId?: string
   nodeId?: string
   value: string
@@ -32,10 +32,9 @@ function App() {
   const imageInputRef = useRef<HTMLInputElement>(null)
   const saveVersionRef = useRef(0)
   const selectedNode = findNode(tree, selectedId)
-  const selectedLeaf = selectedNode?.type === 'leaf' ? selectedNode : undefined
-  const parentBranch = selectedLeaf ? findParentBranch(tree, selectedLeaf.id) : undefined
-  const breadcrumbBranches = selectedLeaf
-    ? (findBranchPath(tree, selectedLeaf.id) ?? []).filter((branch) => branch.id !== tree.id)
+  const noteNode = selectedNode
+  const breadcrumbNodes = noteNode
+    ? (findNodePath(tree, noteNode.id) ?? []).filter((node) => node.id !== tree.id)
     : []
 
   useEffect(() => {
@@ -90,7 +89,7 @@ function App() {
     try {
       await deleteNotebook()
       setTree(initialTree)
-      setSelectedId(findFirstLeaf(initialTree)?.id ?? '')
+      setSelectedId(findFirstNode(initialTree)?.id ?? '')
       setImageUrls({})
       setCollapsedIds([])
       setIsHydrated(true)
@@ -118,7 +117,7 @@ function App() {
       const nextTree = removeNode(tree, dialog.nodeId)
       setTree(nextTree)
       if (selectedId === dialog.nodeId || !findNode(nextTree, selectedId)) {
-        setSelectedId(findFirstLeaf(nextTree)?.id ?? '')
+        setSelectedId(findFirstNode(nextTree)?.id ?? '')
       }
       setCollapsedIds((ids) => ids.filter((id) => id !== dialog.nodeId))
       setDialog(null)
@@ -134,35 +133,23 @@ function App() {
       setDialogError('Nazwa moze miec maksymalnie 100 znakow.')
       return
     }
-    const parentId = dialog.kind === 'note'
+    const parentId = dialog.kind === 'node'
       ? dialog.parentId ?? tree.id
-      : dialog.kind === 'rename'
-        ? findParentBranch(tree, dialog.nodeId ?? '')?.id ?? tree.id
-        : tree.id
+      : findParentNode(tree, dialog.nodeId ?? '')?.id ?? tree.id
     const parentNode = findNode(tree, parentId)
-    if (parentNode?.type !== 'branch') {
-      setDialogError('Wybrana galaz juz nie istnieje.')
+    if (!parentNode) {
+      setDialogError('Wybrany element juz nie istnieje.')
       return
     }
     if (parentNode.children.some((node) => node.id !== dialog.nodeId && node.name.toLowerCase() === name.toLowerCase())) {
       setDialogError('Element o tej nazwie juz istnieje w tej galezi.')
       return
     }
-    if (dialog.kind === 'branch') {
-      const branch: TreeBranch = { id: makeId(), type: 'branch', name, children: [] }
-      setTree((current) => ({ ...current, children: [...current.children, branch] }))
-      setCollapsedIds((ids) => ids.filter((id) => id !== branch.id))
-    } else if (dialog.kind === 'note') {
-      const leaf: TreeLeaf = { id: makeId(), type: 'leaf', name, note: makeNote('') }
-      if (parentId === tree.id) {
-        setTree((current) => ({ ...current, children: [...current.children, leaf] }))
-      } else {
-        setTree((current) => updateNode(current, parentId, (node) => node.type === 'branch'
-          ? { ...node, children: [...node.children, leaf] }
-          : node))
-        setCollapsedIds((ids) => ids.filter((id) => id !== parentId))
-      }
-      setSelectedId(leaf.id)
+    if (dialog.kind === 'node') {
+      const child: TreeNode = { id: makeId(), name, note: makeNote(''), children: [] }
+      setTree((current) => updateNode(current, parentId, (node) => ({ ...node, children: [...node.children, child] })))
+      setCollapsedIds((ids) => ids.filter((id) => id !== parentId))
+      setSelectedId(child.id)
     } else if (dialog.kind === 'rename' && dialog.nodeId) {
       setTree((current) => updateNode(current, dialog.nodeId!, (node) => ({ ...node, name })))
     }
@@ -170,11 +157,12 @@ function App() {
   }
 
   function updateSelectedNote(update: (note: Note) => Note) {
-    if (!selectedLeaf) return
-    const leafId = selectedLeaf.id
-    setTree((current) => updateNode(current, leafId, (node) => node.type === 'leaf'
-      ? { ...node, note: { ...update(node.note), updatedAt: new Date().toISOString() } }
-      : node))
+    if (!noteNode) return
+    const nodeId = noteNode.id
+    setTree((current) => updateNode(current, nodeId, (node) => ({
+      ...node,
+      note: { ...update(node.note), updatedAt: new Date().toISOString() },
+    })))
   }
 
   function updateBlock(blockId: string, update: (block: NoteBlock) => NoteBlock) {
@@ -185,10 +173,10 @@ function App() {
   }
 
   function addTextBlock() {
-    if (!selectedLeaf) return
+    if (!noteNode) return
     const block: TextBlock = {
       id: makeId(), type: 'text', text: '', x: 8,
-      y: Math.max(20, ...selectedLeaf.note.blocks.map((item) => (item.y ?? 20) + 170)),
+      y: Math.max(20, ...noteNode.note.blocks.map((item) => (item.y ?? 20) + 170)),
       width: 82,
     }
     updateSelectedNote((note) => ({ ...note, blocks: [...note.blocks, block] }))
@@ -198,8 +186,8 @@ function App() {
   async function addImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
-    if (!file || !selectedLeaf) return
-    const targetLeafId = selectedLeaf.id
+    if (!file || !noteNode) return
+    const targetNodeId = noteNode.id
     if (!file.type.startsWith('image/')) {
       setEditorMessage('Nieobslugiwany format. Wybierz plik obrazu.')
       return
@@ -215,17 +203,17 @@ function App() {
       setEditorMessage('Nie udalo sie odczytac pliku. Wybierz poprawny obraz.')
       return
     }
-    if (selectedId !== targetLeafId) {
+    if (selectedId !== targetNodeId) {
       setEditorMessage('Notatka zmienila sie podczas sprawdzania obrazu. Sprobuj ponownie.')
       return
     }
-    const targetLeaf = findNode(tree, targetLeafId)
-    if (targetLeaf?.type !== 'leaf') return
+    const target = findNode(tree, targetNodeId)
+    if (!target) return
     const imageWidth = 48
     const block: ImageBlock = {
       id: makeId(), type: 'image', blob: file,
       x: (100 - imageWidth) / 2,
-      y: Math.max(20, ...targetLeaf.note.blocks.map((item) => (item.y ?? 20) + 190)),
+      y: Math.max(20, ...target.note.blocks.map((item) => (item.y ?? 20) + 190)),
       altText: file.name, caption: '', width: imageWidth, alignment: 'center',
     }
     const imageUrl = URL.createObjectURL(file)
@@ -236,9 +224,9 @@ function App() {
 
   function moveCanvasBlock(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
-    if (!selectedLeaf) return
+    if (!noteNode) return
     const blockId = event.dataTransfer.getData('application/x-note-block')
-    const block = selectedLeaf.note.blocks.find((item) => item.id === blockId)
+    const block = noteNode.note.blocks.find((item) => item.id === blockId)
     const bounds = event.currentTarget.getBoundingClientRect()
     if (!block || bounds.width === 0) return
     const nextX = Math.max(0, Math.min(100 - (block.width ?? 82), ((event.clientX - bounds.left) / bounds.width) * 100))
@@ -246,16 +234,8 @@ function App() {
     updateBlock(blockId, (current) => ({ ...current, x: nextX, y: nextY }))
   }
 
-  function nudgeBlock(blockId: string, horizontal: number, vertical: number) {
-    updateBlock(blockId, (block) => ({
-      ...block,
-      x: Math.max(0, Math.min(100 - (block.width ?? 82), (block.x ?? 8) + horizontal)),
-      y: Math.max(0, (block.y ?? 20) + vertical),
-    }))
-  }
-
   function removeBlock(blockId: string) {
-    const block = selectedLeaf?.note.blocks.find((item) => item.id === blockId)
+    const block = noteNode?.note.blocks.find((item) => item.id === blockId)
     const imageUrl = block?.type === 'image' ? imageUrls[blockId] : undefined
     if (imageUrl) URL.revokeObjectURL(imageUrl)
     if (block?.type === 'image') {
@@ -269,77 +249,60 @@ function App() {
     setEditorMessage('Usunieto element.')
   }
 
-  function alignImage(block: ImageBlock, alignment: ImageBlock['alignment']) {
-    const x = alignment === 'left'
-      ? Math.min(8, 100 - block.width)
-      : alignment === 'center'
-        ? Math.max(0, (100 - block.width) / 2)
-        : Math.max(0, 92 - block.width)
-    updateBlock(block.id, (current) => current.type === 'image' ? { ...current, alignment, x } : current)
-  }
-
   return (
-    <div className="notebook-shell">
+    <div className="notebook">
       <aside className="sidebar">
-        <a className="brand" href="#main-content">
-          <span className="brand-mark" aria-hidden="true">GM</span>
-          <span className="brand-name">Game Master<span>Notebook</span></span>
+        <a className="sidebar__brand" href="#main-content">
+          <span className="sidebar__brand-mark" aria-hidden="true">GM</span>
+          <span className="sidebar__brand-name">Game Master<span>Notebook</span></span>
         </a>
-        <div className="sidebar-tools">
-          <label className="search-box">
-            <span aria-hidden="true">/</span>
-            <input type="search" placeholder="Szukaj notatek" aria-label="Szukaj notatek" />
-            <kbd>Ctrl K</kbd>
+        <div className="sidebar__tools">
+          <label className="sidebar__search">
+            <span className="sidebar__search-icon" aria-hidden="true">/</span>
+            <input className="sidebar__search-input" type="search" placeholder="Szukaj notatek" aria-label="Szukaj notatek" />
+            <kbd className="sidebar__search-shortcut">Ctrl K</kbd>
           </label>
-          <button className="new-note-button" type="button" onClick={() => openDialog({ kind: 'note', parentId: parentBranch?.id, value: '' })}><span aria-hidden="true">+</span> Nowa notatka</button>
-          <button className="new-branch-button" type="button" onClick={() => openDialog({ kind: 'branch', value: '' })}>+ Nowa galez</button>
-        </div>
-        <div className="sidebar-spacer" />
-        <div className="sidebar-footer">
-          <span className="avatar" aria-hidden="true">R</span>
-          <span className="profile-name">Rafal</span>
-          <span className="profile-status">Lokalny notes</span>
+          <button className="sidebar__action sidebar__action--primary" type="button" onClick={() => openDialog({ kind: 'node', parentId: selectedId || tree.id, value: '' })}><span className="sidebar__action-icon" aria-hidden="true">+</span> Nowa notatka</button>
         </div>
       </aside>
       <main className="workspace" id="main-content">
         <section className="graph-view">
-          <header className="graph-header">
-            <div className="graph-heading"><span>NOTATNIK KAMPANII</span><h1>Mapa notatek</h1></div>
-            <div className="graph-status-actions">
-              <span className={`save-status save-status-${storageStatus}`} aria-live="polite">
-                <i aria-hidden="true" />
+          <header className="graph-view__header">
+            <div className="graph-view__heading"><span>NOTATNIK KAMPANII</span><h1>Mapa notatek</h1></div>
+            <div className="graph-view__status-actions">
+              <span className={`graph-view__save-status graph-view__save-status--${storageStatus}`} aria-live="polite">
                 {storageStatus === 'loading' || storageStatus === 'load-error' ? 'Wczytywanie...' : storageStatus === 'saving' ? 'Zapisywanie...' : storageStatus === 'error' ? 'Blad zapisu' : 'Zapisano lokalnie'}
               </span>
-              {storageStatus === 'error' && <button className="retry-save-button" type="button" onClick={() => setSaveRetry((retry) => retry + 1)}>Ponow zapis</button>}
+              {storageStatus === 'error' && <button className="graph-view__retry" type="button" onClick={() => setSaveRetry((retry) => retry + 1)}>Ponow zapis</button>}
             </div>
           </header>
-          <div className={`graph-stage${selectedLeaf ? ' has-note-drawer' : ''}`}>
-            <div className="graph-canvas">
+          <div className={`graph-view__stage${noteNode ? ' graph-view__stage--with-drawer' : ''}`}>
+            <div className="graph-view__canvas">
               <TreeGraph
                 tree={tree}
                 selectedId={selectedId}
                 collapsedIds={collapsedIds}
-                onSelectLeaf={setSelectedId}
-                onToggleBranch={(id) => setCollapsedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id])}
-                onAddNote={(branch) => openDialog({ kind: 'note', parentId: branch.id, value: '' })}
+                onSelectNode={setSelectedId}
+                onToggleNode={(id) => setCollapsedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id])}
+                onAddChild={(node) => openDialog({ kind: 'node', parentId: node.id, value: '' })}
                 onRename={(node) => openDialog({ kind: 'rename', nodeId: node.id, value: node.name })}
                 onRemove={(node) => openDialog({ kind: 'delete', nodeId: node.id, value: node.name })}
               />
             </div>
-            <aside className={`note-drawer${selectedLeaf ? ' is-open' : ''}`} aria-hidden={!selectedLeaf}>
-              {selectedLeaf && <>
-                <header className="drawer-header">
-                  <nav className="note-breadcrumbs" aria-label="Sciezka notatki">
-                    {breadcrumbBranches.map((branch) => <span key={branch.id}>{branch.name}<i aria-hidden="true">/</i></span>)}
-                    <strong>{selectedLeaf.name}</strong>
+            <aside className={`note-drawer${noteNode ? ' note-drawer--open' : ''}`} aria-hidden={!noteNode}>
+              {noteNode && <>
+                <header className="note-drawer__header">
+                  <nav className="note-drawer__breadcrumbs" aria-label="Sciezka notatki">
+                    {breadcrumbNodes.map((node) => <span key={node.id}>{node.name}<i aria-hidden="true">/</i></span>)}
+                    <strong>{noteNode.name}</strong>
                   </nav>
-                  <button className="drawer-close" type="button" aria-label="Zamknij notatke" onClick={() => setSelectedId('')}>x</button>
+                  <button className="note-drawer__close" type="button" aria-label="Zamknij notatke" onClick={() => setSelectedId('')}>x</button>
                 </header>
-                <div className="drawer-scroll">
+                <div className="note-drawer__scroll">
                   <NoteEditor
-                    title={selectedLeaf.name}
-                    updatedAt={selectedLeaf.note.updatedAt}
-                    blocks={selectedLeaf.note.blocks}
+                    title={noteNode.name}
+                    updatedAt={noteNode.note.updatedAt}
+                    blocks={noteNode.note.blocks}
                     imageUrls={imageUrls}
                     editorMessage={editorMessage}
                     imageInputRef={imageInputRef}
@@ -347,9 +310,7 @@ function App() {
                     onAddImage={addImage}
                     onUpdateBlock={updateBlock}
                     onMoveBlock={moveCanvasBlock}
-                    onNudgeBlock={nudgeBlock}
                     onRemoveBlock={removeBlock}
-                    onAlignImage={alignImage}
                   />
                 </div>
               </>}
@@ -357,26 +318,27 @@ function App() {
           </div>
         </section>
       </main>
-      {dialog && <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null) }}>
-        <form className="tree-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" onSubmit={submitDialog}>
-          <h2 id="dialog-title">{dialog.kind === 'branch' ? 'Nowa galaz' : dialog.kind === 'note' ? 'Nowa notatka' : dialog.kind === 'rename' ? 'Zmien nazwe' : 'Usun element?'}</h2>
-          {dialog.kind === 'delete' ? <p>Czy na pewno usunac „{dialog.value}” wraz z zawartoscia?</p> : (
-            <label>Nazwa<input autoFocus value={dialog.value} onChange={(event) => { setDialog({ ...dialog, value: event.target.value }); setDialogError('') }} maxLength={100} aria-describedby={dialogError ? 'dialog-error' : undefined} /></label>
+      {dialog && <div className="dialog__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null) }}>
+        <form className="dialog__form" role="dialog" aria-modal="true" aria-labelledby="dialog-title" onSubmit={submitDialog}>
+          <h2 className="dialog__title" id="dialog-title">{dialog.kind === 'node' ? 'Nowa notatka' : dialog.kind === 'rename' ? 'Zmien nazwe' : 'Usun element?'}</h2>
+          {dialog.kind !== 'delete' && (
+            <label className="dialog__field">Nazwa<input className="dialog__input" autoFocus value={dialog.value} onChange={(event) => { setDialog({ ...dialog, value: event.target.value }); setDialogError('') }} maxLength={100} aria-describedby={dialogError ? 'dialog-error' : undefined} /></label>
           )}
-          {dialogError && <p className="dialog-error" id="dialog-error" role="alert">{dialogError}</p>}
-          <div className="dialog-actions">
-            <button type="button" className="cancel-button" onClick={() => setDialog(null)}>Anuluj</button>
-            <button type="submit" className={dialog.kind === 'delete' ? 'delete-button' : 'confirm-button'}>{dialog.kind === 'delete' ? 'Usun' : 'Zapisz'}</button>
+          {dialog.kind === 'delete' && <p className="dialog__copy">Czy na pewno usunac „{dialog.value}” wraz z zawartoscia?</p>}
+          {dialogError && <p className="dialog__error" id="dialog-error" role="alert">{dialogError}</p>}
+          <div className="dialog__actions">
+            <button type="button" className="dialog__button" onClick={() => setDialog(null)}>Anuluj</button>
+            <button type="submit" className={`dialog__button ${dialog.kind === 'delete' ? 'dialog__button--delete' : 'dialog__button--confirm'}`}>{dialog.kind === 'delete' ? 'Usun' : 'Zapisz'}</button>
           </div>
         </form>
       </div>}
-      {!isHydrated && storageStatus === 'loading' && <div className="storage-loading" role="status">Wczytywanie notatek...</div>}
-      {storageStatus === 'load-error' && <div className="storage-loading storage-recovery" role="alert">
+      {!isHydrated && storageStatus === 'loading' && <div className="storage-state" role="status">Wczytywanie notatek...</div>}
+      {storageStatus === 'load-error' && <div className="storage-state storage-state--recovery" role="alert">
         <div>
-          <p>{loadError || 'Nie udalo sie odczytac lokalnych danych. Nie zostaly nadpisane.'}</p>
-          <div className="recovery-actions">
-            <button type="button" onClick={retryStorageLoad}>Ponow probe</button>
-            <button type="button" onClick={resetStorageAfterConfirmation}>Usun dane i zacznij od nowa</button>
+          <p className="storage-state__message">{loadError || 'Nie udalo sie odczytac lokalnych danych. Nie zostaly nadpisane.'}</p>
+          <div className="storage-state__actions">
+            <button className="storage-state__button" type="button" onClick={retryStorageLoad}>Ponow probe</button>
+            <button className="storage-state__button storage-state__button--danger" type="button" onClick={resetStorageAfterConfirmation}>Usun dane i zacznij od nowa</button>
           </div>
         </div>
       </div>}
