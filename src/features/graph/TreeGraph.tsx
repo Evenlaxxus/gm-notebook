@@ -23,7 +23,6 @@ type GraphNodeData = {
   isRoot: boolean
   activate: () => void
   addNote: () => void
-  rename: () => void
   remove: () => void
   dropTarget: boolean
 }
@@ -37,7 +36,6 @@ type TreeGraphProps = {
   onSelectNode: (id: string) => void
   onToggleNode: (id: string) => void
   onAddChild: (node: TreeNode) => void
-  onRename: (node: TreeNode) => void
   onRemove: (node: TreeNode) => void
   onMoveNode: (movingId: string, targetId: string) => void
 }
@@ -64,10 +62,7 @@ function NotebookNode({ id, data }: NodeProps<GraphNode>) {
         </button>
         <div className="tree-graph__node-actions">
           <button type="button" title="Dodaj element" aria-label={`Dodaj element w ${data.label}`} onClick={data.addNote}>+</button>
-          {!data.isRoot && <>
-            <button type="button" title="Zmien nazwe" aria-label={`Zmien nazwe ${data.label}`} onClick={data.rename}>...</button>
-            <button type="button" title="Usun" aria-label={`Usun ${data.label}`} onClick={data.remove}>x</button>
-          </>}
+          {!data.isRoot && <button type="button" title="Usun" aria-label={`Usun ${data.label}`} onClick={data.remove}>x</button>}
         </div>
         {data.childCount > 0 && <button
           className="tree-graph__node-toggle"
@@ -92,7 +87,6 @@ function layoutTree(
   onSelectNode: (id: string) => void,
   onToggleNode: (id: string) => void,
   onAddChild: (node: TreeNode) => void,
-  onRename: (node: TreeNode) => void,
   onRemove: (node: TreeNode) => void,
   dropTargetId: string | null,
 ): { nodes: GraphNode[]; edges: Edge[] } {
@@ -113,6 +107,8 @@ function layoutTree(
       id: node.id,
       type: 'notebookNode',
       position: { x: depth * 260 + 28, y },
+      initialWidth: 226,
+      initialHeight: 54,
       data: {
         label: node.name,
         childCount: node.children.length,
@@ -122,7 +118,6 @@ function layoutTree(
         activate: () => onSelectNode(node.id),
         toggle: () => onToggleNode(node.id),
         addNote: () => onAddChild(node),
-        rename: () => onRename(node),
         remove: () => onRemove(node),
         dropTarget: node.id === dropTargetId,
       },
@@ -144,7 +139,7 @@ function layoutTree(
   return { nodes, edges }
 }
 
-function TreeGraph({ tree, selectedId, collapsedIds, onSelectNode, onToggleNode, onAddChild, onRename, onRemove, onMoveNode }: TreeGraphProps) {
+function TreeGraph({ tree, selectedId, collapsedIds, onSelectNode, onToggleNode, onAddChild, onRemove, onMoveNode }: TreeGraphProps) {
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
   const dragPreviewRef = useRef<HTMLDivElement>(null)
@@ -214,8 +209,8 @@ function TreeGraph({ tree, selectedId, collapsedIds, onSelectNode, onToggleNode,
   }, [onMoveNode, tree])
 
   const graph = useMemo(
-    () => layoutTree(tree, selectedId, collapsedIds, onSelectNode, onToggleNode, onAddChild, onRename, onRemove, dropTargetId),
-    [tree, selectedId, collapsedIds, onSelectNode, onToggleNode, onAddChild, onRename, onRemove, dropTargetId],
+    () => layoutTree(tree, selectedId, collapsedIds, onSelectNode, onToggleNode, onAddChild, onRemove, dropTargetId),
+    [tree, selectedId, collapsedIds, onSelectNode, onToggleNode, onAddChild, onRemove, dropTargetId],
   )
 
   const handleClickCapture = useCallback((event: React.MouseEvent) => {
@@ -272,7 +267,6 @@ function areTreeGraphPropsEqual(previous: TreeGraphProps, next: TreeGraphProps):
     && previous.onSelectNode === next.onSelectNode
     && previous.onToggleNode === next.onToggleNode
     && previous.onAddChild === next.onAddChild
-    && previous.onRename === next.onRename
     && previous.onRemove === next.onRemove
     && previous.onMoveNode === next.onMoveNode
     && hasSameTreeStructure(previous.tree, next.tree)

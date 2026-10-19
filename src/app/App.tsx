@@ -10,8 +10,7 @@ import TreeGraph from '../features/graph/TreeGraph'
 import './App.scss'
 
 type DialogState = {
-  kind: 'node' | 'rename' | 'delete'
-  parentId?: string
+  kind: 'delete'
   nodeId?: string
   value: string
 }
@@ -36,7 +35,6 @@ function App() {
   const [drawerWidthPercent, setDrawerWidthPercent] = useState<number | null>(null)
   const [isResizingDrawer, setIsResizingDrawer] = useState(false)
   const [dialog, setDialog] = useState<DialogState | null>(null)
-  const [dialogError, setDialogError] = useState('')
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [editorMessage, setEditorMessage] = useState('')
   const [isHydrated, setIsHydrated] = useState(false)
@@ -50,19 +48,24 @@ function App() {
   const handleToggleNode = useCallback((id: string) => {
     setCollapsedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id])
   }, [])
-  const openDialog = useCallback((nextDialog: DialogState) => {
-    setDialogError('')
-    setDialog(nextDialog)
-  }, [])
   const handleAddChild = useCallback((node: TreeNode) => {
-    openDialog({ kind: 'node', parentId: node.id, value: '' })
-  }, [openDialog])
-  const handleRename = useCallback((node: TreeNode) => {
-    openDialog({ kind: 'rename', nodeId: node.id, value: node.name })
-  }, [openDialog])
+    const parentNode = findNode(tree, node.id)
+    if (!parentNode) return
+    const baseName = 'Nowa notatka'
+    let name = baseName
+    let suffix = 2
+    while (parentNode.children.some((child) => child.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      name = `${baseName} ${suffix}`
+      suffix += 1
+    }
+    const child: TreeNode = { id: makeId(), name, note: makeNote(''), children: [] }
+    setTree((current) => updateNode(current, parentNode.id, (parent) => ({ ...parent, children: [...parent.children, child] })))
+    setCollapsedIds((ids) => ids.filter((id) => id !== parentNode.id))
+    setSelectedId(child.id)
+  }, [tree])
   const handleRemove = useCallback((node: TreeNode) => {
-    openDialog({ kind: 'delete', nodeId: node.id, value: node.name })
-  }, [openDialog])
+    setDialog({ kind: 'delete', nodeId: node.id, value: node.name })
+  }, [])
   const imageInputRef = useRef<HTMLInputElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -228,36 +231,23 @@ function App() {
       return
     }
 
-    const name = dialog.value.trim()
-    if (!name) {
-      setDialogError('Nazwa nie moze byc pusta.')
-      return
-    }
-    if (name.length > 100) {
-      setDialogError('Nazwa moze miec maksymalnie 100 znakow.')
-      return
-    }
-    const parentId = dialog.kind === 'node'
-      ? dialog.parentId ?? tree.id
-      : findParentNode(tree, dialog.nodeId ?? '')?.id ?? tree.id
-    const parentNode = findNode(tree, parentId)
-    if (!parentNode) {
-      setDialogError('Wybrany element juz nie istnieje.')
-      return
-    }
-    if (parentNode.children.some((node) => node.id !== dialog.nodeId && node.name.toLowerCase() === name.toLowerCase())) {
-      setDialogError('Element o tej nazwie juz istnieje w tej galezi.')
-      return
-    }
-    if (dialog.kind === 'node') {
-      const child: TreeNode = { id: makeId(), name, note: makeNote(''), children: [] }
-      setTree((current) => updateNode(current, parentId, (node) => ({ ...node, children: [...node.children, child] })))
-      setCollapsedIds((ids) => ids.filter((id) => id !== parentId))
-      setSelectedId(child.id)
-    } else if (dialog.kind === 'rename' && dialog.nodeId) {
-      setTree((current) => updateNode(current, dialog.nodeId!, (node) => ({ ...node, name })))
-    }
     setDialog(null)
+  }
+
+  function renameSelectedNote(value: string): string | null {
+    if (!noteNode) return 'Nie mozna znalezc notatki.'
+    const name = value.trim()
+    if (!name) return 'Nazwa nie moze byc pusta.'
+    if (name.length > 100) return 'Nazwa moze miec maksymalnie 100 znakow.'
+    const parentNode = findParentNode(tree, noteNode.id)
+    if (!parentNode) return 'Wybrany element juz nie istnieje.'
+    if (parentNode.children.some((node) => node.id !== noteNode.id && node.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      return 'Element o tej nazwie juz istnieje w tej galezi.'
+    }
+    if (name !== noteNode.name) {
+      setTree((current) => updateNode(current, noteNode.id, (node) => ({ ...node, name })))
+    }
+    return null
   }
 
   function updateSelectedNote(update: (note: Note) => Note) {
@@ -366,7 +356,7 @@ function App() {
             <input ref={searchInputRef} className="sidebar__search-input" type="search" placeholder="Szukaj notatek" aria-label="Szukaj notatek" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
             <kbd className="sidebar__search-shortcut">Ctrl K</kbd>
           </label>
-          <button className="sidebar__action sidebar__action--primary" type="button" onClick={() => openDialog({ kind: 'node', parentId: selectedId || tree.id, value: '' })}><span className="sidebar__action-icon" aria-hidden="true">+</span> Nowa notatka</button>
+          <button className="sidebar__action sidebar__action--primary" type="button" onClick={() => handleAddChild(findNode(tree, selectedId) ?? tree)}><span className="sidebar__action-icon" aria-hidden="true">+</span> Nowa notatka</button>
         </div>
         {searchQuery.trim() && <section className="sidebar__results" aria-label="Wyniki wyszukiwania">
           {searchResults.length > 0 ? searchResults.map(({ node, path }) => (
@@ -409,7 +399,6 @@ function App() {
                 onSelectNode={setSelectedId}
                 onToggleNode={handleToggleNode}
                 onAddChild={handleAddChild}
-                onRename={handleRename}
                 onRemove={handleRemove}
                 onMoveNode={handleMoveNode}
               />
@@ -441,7 +430,9 @@ function App() {
                 </header>
                 <div className="note-drawer__scroll">
                   <NoteEditor
+                    key={noteNode.id}
                     title={noteNode.name}
+                    onRename={renameSelectedNote}
                     updatedAt={noteNode.note.updatedAt}
                     blocks={noteNode.note.blocks}
                     imageUrls={imageUrls}
@@ -462,15 +453,11 @@ function App() {
       {isSidebarOpen && <button className="sidebar-backdrop" type="button" aria-label="Zamknij panel boczny" onClick={() => setIsSidebarOpen(false)} />}
       {dialog && <div className="dialog__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null) }}>
         <form className="dialog__form" role="dialog" aria-modal="true" aria-labelledby="dialog-title" onSubmit={submitDialog}>
-          <h2 className="dialog__title" id="dialog-title">{dialog.kind === 'node' ? 'Nowa notatka' : dialog.kind === 'rename' ? 'Zmien nazwe' : 'Usun element?'}</h2>
-          {dialog.kind !== 'delete' && (
-            <label className="dialog__field">Nazwa<input className="dialog__input" autoFocus value={dialog.value} onChange={(event) => { setDialog({ ...dialog, value: event.target.value }); setDialogError('') }} maxLength={100} aria-describedby={dialogError ? 'dialog-error' : undefined} /></label>
-          )}
-          {dialog.kind === 'delete' && <p className="dialog__copy">Czy na pewno usunac „{dialog.value}” wraz z zawartoscia?</p>}
-          {dialogError && <p className="dialog__error" id="dialog-error" role="alert">{dialogError}</p>}
+          <h2 className="dialog__title" id="dialog-title">Usun element?</h2>
+          <p className="dialog__copy">Czy na pewno usunac „{dialog.value}” wraz z zawartoscia?</p>
           <div className="dialog__actions">
             <button type="button" className="dialog__button" onClick={() => setDialog(null)}>Anuluj</button>
-            <button type="submit" className={`dialog__button ${dialog.kind === 'delete' ? 'dialog__button--delete' : 'dialog__button--confirm'}`}>{dialog.kind === 'delete' ? 'Usun' : 'Zapisz'}</button>
+            <button type="submit" className="dialog__button dialog__button--delete">Usun</button>
           </div>
         </form>
       </div>}

@@ -1,9 +1,10 @@
-import { useRef, type ChangeEvent, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import type { NoteBlock } from '../../domain/model'
 import './NoteEditor.scss'
 
 type NoteEditorProps = {
   title: string
+  onRename: (name: string) => string | null
   updatedAt: string
   blocks: NoteBlock[]
   imageUrls: Record<string, string>
@@ -18,6 +19,7 @@ type NoteEditorProps = {
 
 export default function NoteEditor({
   title,
+  onRename,
   updatedAt,
   blocks,
   imageUrls,
@@ -29,8 +31,42 @@ export default function NoteEditor({
   onMoveBlock,
   onRemoveBlock,
 }: NoteEditorProps) {
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [draftTitle, setDraftTitle] = useState(title)
+  const [renameError, setRenameError] = useState('')
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const cancelRenameRef = useRef(false)
   const imageResizeRef = useRef<{ pointerId: number; clientX: number; width: number; x: number; canvasWidth: number } | null>(null)
   const textResizeRef = useRef<{ pointerId: number; clientX: number; clientY: number; width: number; height: number; x: number; canvasWidth: number } | null>(null)
+
+  function startRenaming() {
+    setDraftTitle(title)
+    setRenameError('')
+    setIsRenaming(true)
+  }
+
+  function finishRenaming() {
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false
+      return
+    }
+    const error = onRename(draftTitle)
+    if (error) {
+      setRenameError(error)
+      window.requestAnimationFrame(() => titleInputRef.current?.focus())
+      return
+    }
+    setRenameError('')
+    setIsRenaming(false)
+  }
+
+  function cancelRenaming() {
+    cancelRenameRef.current = true
+    setDraftTitle(title)
+    setRenameError('')
+    setIsRenaming(false)
+    titleInputRef.current?.blur()
+  }
 
   function startTextResize(event: ReactPointerEvent<HTMLButtonElement>, block: Extract<NoteBlock, { type: 'text' }>) {
     event.preventDefault()
@@ -111,7 +147,29 @@ export default function NoteEditor({
   return (
     <article className="note-editor">
       <div className="note-editor__kicker"><span />NOTATKA</div>
-      <h1 className="note-editor__title">{title}</h1>
+      <h1 className="note-editor__title">{isRenaming ? (
+        <input
+          ref={titleInputRef}
+          className="note-editor__title-input"
+          aria-label="Nazwa notatki"
+          autoFocus
+          maxLength={100}
+          value={draftTitle}
+          onChange={(event) => { setDraftTitle(event.target.value); setRenameError('') }}
+          onBlur={finishRenaming}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              event.currentTarget.blur()
+            } else if (event.key === 'Escape') {
+              cancelRenaming()
+            }
+          }}
+        />
+      ) : (
+        <button className="note-editor__title-button" type="button" onClick={startRenaming} aria-label={`Zmien nazwe: ${title}`}>{title}</button>
+      )}</h1>
+      {renameError && <p className="note-editor__title-error" role="alert">{renameError}</p>}
       <div className="note-editor__metadata">Ostatnia edycja: {new Date(updatedAt).toLocaleDateString()}</div>
       <hr className="note-editor__divider" />
       <div className="note-editor__toolbar">
