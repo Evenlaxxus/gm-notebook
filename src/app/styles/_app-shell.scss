@@ -3,7 +3,7 @@
 .notebook {
   min-height: 100svh;
   display: grid;
-  grid-template-columns: tokens.$sidebar-width minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   color: var(--color-text);
   background: var(--color-shell);
 }
@@ -17,16 +17,9 @@
   overflow: hidden;
 }
 
-@media (max-width: tokens.$breakpoint-tablet) {
-  .notebook {
-    grid-template-columns: tokens.$sidebar-width-tablet minmax(0, 1fr);
-  }
-}
-
 @media (max-width: tokens.$breakpoint-mobile) {
   .notebook {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .workspace {

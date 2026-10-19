@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent, type DragEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { useRef, type ChangeEvent, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import type { NoteBlock } from '../../domain/model'
 import './NoteEditor.scss'
 
@@ -30,6 +30,55 @@ export default function NoteEditor({
   onRemoveBlock,
 }: NoteEditorProps) {
   const imageResizeRef = useRef<{ pointerId: number; clientX: number; width: number; x: number; canvasWidth: number } | null>(null)
+  const textResizeRef = useRef<{ pointerId: number; clientX: number; clientY: number; width: number; height: number; x: number; canvasWidth: number } | null>(null)
+
+  function startTextResize(event: ReactPointerEvent<HTMLButtonElement>, block: Extract<NoteBlock, { type: 'text' }>) {
+    event.preventDefault()
+    event.stopPropagation()
+    const canvas = event.currentTarget.closest('.note-editor__canvas')
+    const blockElement = event.currentTarget.closest('.note-editor__block')
+    const canvasWidth = canvas?.getBoundingClientRect().width ?? 0
+    const blockHeight = blockElement?.getBoundingClientRect().height ?? 0
+    if (canvasWidth === 0 || blockHeight === 0) return
+    textResizeRef.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      width: block.width ?? 82,
+      height: block.height ?? blockHeight,
+      x: block.x ?? 8,
+      canvasWidth,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function resizeText(event: ReactPointerEvent<HTMLButtonElement>, blockId: string) {
+    const resize = textResizeRef.current
+    if (!resize || resize.pointerId !== event.pointerId) return
+    const minWidth = Math.min((180 / resize.canvasWidth) * 100, 100 - resize.x)
+    const width = Math.max(minWidth, Math.min(100 - resize.x, resize.width + ((event.clientX - resize.clientX) / resize.canvasWidth) * 100))
+    const height = Math.max(106, resize.height + event.clientY - resize.clientY)
+    onUpdateBlock(blockId, (current) => current.type === 'text' ? { ...current, width, height } : current)
+  }
+
+  function finishTextResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (textResizeRef.current?.pointerId === event.pointerId) textResizeRef.current = null
+  }
+
+  function resizeTextWithKeyboard(event: ReactKeyboardEvent<HTMLButtonElement>, block: Extract<NoteBlock, { type: 'text' }>) {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
+    event.preventDefault()
+    event.stopPropagation()
+    const canvasWidth = event.currentTarget.closest('.note-editor__canvas')?.getBoundingClientRect().width ?? 0
+    const blockHeight = event.currentTarget.closest('.note-editor__block')?.getBoundingClientRect().height ?? 106
+    if (canvasWidth === 0) return
+    const step = event.shiftKey ? 10 : 2
+    const minWidth = Math.min((180 / canvasWidth) * 100, 100 - (block.x ?? 8))
+    const width = Math.max(minWidth, Math.min(100 - (block.x ?? 8), (block.width ?? 82) + (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0)))
+    const heightStep = event.shiftKey ? 50 : 20
+    const height = Math.max(106, (block.height ?? blockHeight) + (event.key === 'ArrowDown' ? heightStep : event.key === 'ArrowUp' ? -heightStep : 0))
+    onUpdateBlock(block.id, (current) => current.type === 'text' ? { ...current, width, height } : current)
+  }
 
   function startImageResize(event: ReactPointerEvent<HTMLButtonElement>, block: Extract<NoteBlock, { type: 'image' }>) {
     event.preventDefault()
@@ -105,7 +154,20 @@ export default function NoteEditor({
                   placeholder="Wpisz tekst..."
                   value={block.text}
                   rows={4}
+                  style={block.height ? { height: `${block.height}px` } : undefined}
                   onChange={(event) => onUpdateBlock(block.id, (current) => current.type === 'text' ? { ...current, text: event.target.value } : current)}
+                />
+                <button
+                  className="note-editor__text-resize"
+                  type="button"
+                  aria-label="Zmien szerokosc i wysokosc bloku tekstowego"
+                  title="Przeciagnij, aby zmienic szerokosc i wysokosc"
+                  onPointerDown={(event) => startTextResize(event, block)}
+                  onPointerMove={(event) => resizeText(event, block.id)}
+                  onPointerUp={finishTextResize}
+                  onPointerCancel={finishTextResize}
+                  onLostPointerCapture={finishTextResize}
+                  onKeyDown={(event) => resizeTextWithKeyboard(event, block)}
                 />
               </>
             ) : (

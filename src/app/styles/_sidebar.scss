@@ -1,8 +1,11 @@
 @use '../../styles/tokens' as tokens;
 
 .sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  z-index: 21;
+  width: min(#{tokens.$sidebar-width}, calc(100vw - 48px));
   height: 100svh;
   min-height: 620px;
   display: flex;
@@ -11,6 +14,13 @@
   border-right: 1px solid var(--color-border);
   color: var(--color-text);
   background: var(--color-sidebar);
+  box-shadow: var(--shadow-panel);
+  transform: translateX(-100%);
+  transition: transform 260ms cubic-bezier(.2, .75, .25, 1);
+
+  &--open {
+    transform: translateX(0);
+  }
 
   &__brand {
     min-height: 42px;
@@ -91,6 +101,56 @@
     white-space: nowrap;
   }
 
+  &__results {
+    display: grid;
+    gap: 3px;
+    max-height: min(48svh, 420px);
+    margin: -14px 2px 16px;
+    overflow-y: auto;
+  }
+
+  &__result {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 8px 9px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--color-text);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--color-border);
+      background: var(--color-control);
+    }
+  }
+
+  &__result-name {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__result-path {
+    overflow: hidden;
+    color: var(--color-text-soft);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__no-results {
+    margin: 0;
+    padding: 8px 9px;
+    color: var(--color-text-soft);
+    font-size: 11px;
+  }
+
   &__action {
     min-height: 35px;
     display: flex;
@@ -166,6 +226,22 @@
   }
 }
 
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  padding: 0;
+  border: 0;
+  background: var(--color-scrim);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}
+
 @media (max-width: tokens.$breakpoint-tablet) {
   .sidebar {
     padding-inline: 10px;
@@ -174,11 +250,9 @@
 
 @media (max-width: tokens.$breakpoint-mobile) {
   .sidebar {
-    position: relative;
-    height: auto;
     min-height: 0;
     padding: 9px 12px;
-    border-right: 0;
+    border-right: 1px solid var(--color-border);
 
     &__brand {
       min-height: 34px;

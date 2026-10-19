@@ -37,6 +37,7 @@ export function findFirstNode(node: TreeNode): TreeNode | undefined {
 }
 
 export function updateNode(node: TreeNode, id: string, update: (node: TreeNode) => TreeNode): TreeNode {
+  if (node.id === id) return update(node)
   return {
     ...node,
     children: node.children.map((child) => {

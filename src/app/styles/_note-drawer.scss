@@ -20,6 +20,36 @@
     pointer-events: auto;
   }
 
+  &__resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 3;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+
+    &::after {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 3px;
+      width: 2px;
+      background: var(--color-border);
+      content: '';
+    }
+
+    &:hover::after,
+    &:focus-visible::after {
+      background: var(--color-accent);
+    }
+
+    &:focus-visible {
+      outline: none;
+    }
+  }
+
   &__header {
     min-height: 56px;
     display: flex;
@@ -92,6 +122,10 @@
 
 @media (max-width: tokens.$breakpoint-mobile) {
   .note-drawer {
+    &__resize-handle {
+      display: none;
+    }
+
     &__header {
       min-height: 50px;
       padding-inline: 13px;

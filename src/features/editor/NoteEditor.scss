@@ -83,7 +83,7 @@
 
     &--text {
       min-width: 180px;
-      border: 1px solid transparent;
+      border: 3px solid transparent;
       border-radius: 5px;
       cursor: grab;
 
@@ -102,6 +102,7 @@
 
       .note-editor__textarea {
         cursor: text;
+        resize: none;
       }
 
       .note-editor__block-remove {
@@ -119,6 +120,35 @@
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
+      }
+
+      .note-editor__text-resize {
+        position: absolute;
+        z-index: 2;
+        right: 1px;
+        bottom: 1px;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: nwse-resize;
+        touch-action: none;
+
+        &::after {
+          position: absolute;
+          right: 3px;
+          bottom: 3px;
+          width: 10px;
+          height: 10px;
+          background: repeating-linear-gradient(135deg, transparent 0 3px, var(--color-text-soft) 3px 4px, transparent 4px 6px);
+          content: '';
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--color-accent-strong);
+          outline-offset: 1px;
+        }
       }
     }
 
@@ -184,7 +214,7 @@
   &__block-remove {
     min-width: 0;
     height: auto;
-    padding: 0;
+    padding: 5px;
     border: 0;
     border-radius: 0;
     color: var(--color-danger-soft);

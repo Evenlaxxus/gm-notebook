@@ -8,7 +8,8 @@
   flex-direction: column;
 
   &__header {
-    min-height: 72px;
+    position: relative;
+    z-index: 22;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -16,6 +17,41 @@
     padding: 12px 25px;
     border-bottom: 1px solid var(--color-border);
     background: var(--color-surface);
+  }
+
+  &__menu-toggle {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    color: var(--color-text);
+    background: var(--color-control);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-control-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  &__menu-icon {
+    width: 16px;
+    display: grid;
+    gap: 3px;
+
+    i {
+      height: 1.5px;
+      border-radius: 1px;
+      background: currentColor;
+    }
   }
 
   &__heading {
@@ -105,6 +141,10 @@
 
   &__stage--with-drawer &__canvas {
     right: var(--drawer-width);
+  }
+
+  &__stage--resizing &__canvas {
+    transition: none;
   }
 }
 

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type CSSProperties } from 'react'
 import '@xyflow/react/dist/style.css'
 import type { ImageBlock, Note, NoteBlock, TextBlock, TreeNode } from '../domain/model'
 import { createId as makeId } from '../domain/ids'
 import { createNote as makeNote, initialTree } from '../domain/initialTree'
-import { findFirstNode, findNode, findNodePath, findParentNode, getImagesInNode, removeNode, updateNode } from '../domain/tree'
+import { findFirstNode, findNode, findNodePath, findParentNode, getImagesInNode, moveNode, removeNode, updateNode } from '../domain/tree'
 import { deleteNotebook, loadNotebook, saveNotebook } from '../storage/indexedDb'
 import NoteEditor from '../features/editor/NoteEditor'
 import TreeGraph from '../features/graph/TreeGraph'
@@ -16,10 +16,25 @@ type DialogState = {
   value: string
 }
 
+function findNamedNodes(node: TreeNode, query: string, path: string[] = []): { node: TreeNode; path: string[] }[] {
+  return node.children.flatMap((child) => {
+    const childPath = [...path, child.name]
+    const matches = child.name.toLocaleLowerCase().includes(query.toLocaleLowerCase())
+    return [
+      ...(matches ? [{ node: child, path: childPath }] : []),
+      ...findNamedNodes(child, query, childPath),
+    ]
+  })
+}
+
 function App() {
   const [tree, setTree] = useState(initialTree)
   const [selectedId, setSelectedId] = useState('')
   const [collapsedIds, setCollapsedIds] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [drawerWidthPercent, setDrawerWidthPercent] = useState<number | null>(null)
+  const [isResizingDrawer, setIsResizingDrawer] = useState(false)
   const [dialog, setDialog] = useState<DialogState | null>(null)
   const [dialogError, setDialogError] = useState('')
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
@@ -29,10 +44,35 @@ function App() {
   const [loadError, setLoadError] = useState('')
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [saveRetry, setSaveRetry] = useState(0)
+  const handleMoveNode = useCallback((movingId: string, targetId: string) => {
+    setTree((currentTree) => moveNode(currentTree, movingId, targetId) ?? currentTree)
+  }, [])
+  const handleToggleNode = useCallback((id: string) => {
+    setCollapsedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id])
+  }, [])
+  const openDialog = useCallback((nextDialog: DialogState) => {
+    setDialogError('')
+    setDialog(nextDialog)
+  }, [])
+  const handleAddChild = useCallback((node: TreeNode) => {
+    openDialog({ kind: 'node', parentId: node.id, value: '' })
+  }, [openDialog])
+  const handleRename = useCallback((node: TreeNode) => {
+    openDialog({ kind: 'rename', nodeId: node.id, value: node.name })
+  }, [openDialog])
+  const handleRemove = useCallback((node: TreeNode) => {
+    openDialog({ kind: 'delete', nodeId: node.id, value: node.name })
+  }, [openDialog])
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const drawerRef = useRef<HTMLElement>(null)
+  const resizePointerIdRef = useRef<number | null>(null)
+  const pendingDrawerWidthPercentRef = useRef<number | null>(null)
   const saveVersionRef = useRef(0)
   const selectedNode = findNode(tree, selectedId)
   const noteNode = selectedNode
+  const searchResults = searchQuery.trim() ? findNamedNodes(tree, searchQuery.trim()) : []
   const breadcrumbNodes = noteNode
     ? (findNodePath(tree, noteNode.id) ?? []).filter((node) => node.id !== tree.id)
     : []
@@ -70,9 +110,73 @@ function App() {
     return () => window.clearTimeout(timeout)
   }, [tree, isHydrated, saveRetry])
 
-  function openDialog(nextDialog: DialogState) {
-    setDialogError('')
-    setDialog(nextDialog)
+  useEffect(() => {
+    function focusSearch(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setIsSidebarOpen(true)
+        window.setTimeout(() => searchInputRef.current?.focus(), 0)
+      } else if (event.key === 'Escape') {
+        setIsSidebarOpen(false)
+      }
+    }
+    window.addEventListener('keydown', focusSearch)
+    return () => window.removeEventListener('keydown', focusSearch)
+  }, [])
+
+  function selectSearchResult(node: TreeNode) {
+    setSelectedId(node.id)
+    const path = findNodePath(tree, node.id) ?? []
+    const ancestorIds = new Set(path.slice(0, -1).map((item) => item.id))
+    setCollapsedIds((ids) => ids.filter((id) => !ancestorIds.has(id)))
+    setSearchQuery('')
+  }
+
+  function resizeDrawer(clientX: number, commit = true) {
+    const bounds = stageRef.current?.getBoundingClientRect()
+    if (!bounds || bounds.width === 0) return
+    const minWidth = Math.min(360, bounds.width * 0.45)
+    const maxWidth = bounds.width * 0.82
+    const width = Math.max(minWidth, Math.min(maxWidth, bounds.right - clientX))
+    const widthPercent = (width / bounds.width) * 100
+    if (commit) {
+      setDrawerWidthPercent(widthPercent)
+      return
+    }
+    pendingDrawerWidthPercentRef.current = widthPercent
+    stageRef.current?.style.setProperty('--drawer-width', `${widthPercent}%`)
+  }
+
+  function handleDrawerResizeStart(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    resizePointerIdRef.current = event.pointerId
+    setIsResizingDrawer(true)
+  }
+
+  function handleDrawerResizeMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (resizePointerIdRef.current !== event.pointerId) return
+    resizeDrawer(event.clientX, false)
+  }
+
+  function handleDrawerResizeEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    if (resizePointerIdRef.current !== event.pointerId) return
+    resizePointerIdRef.current = null
+    if (pendingDrawerWidthPercentRef.current !== null) {
+      setDrawerWidthPercent(pendingDrawerWidthPercentRef.current)
+      pendingDrawerWidthPercentRef.current = null
+    }
+    setIsResizingDrawer(false)
+  }
+
+  function handleDrawerResizeKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    const stageBounds = stageRef.current?.getBoundingClientRect()
+    const currentWidth = drawerRef.current?.getBoundingClientRect().width
+    if (!stageBounds || !stageBounds.width || !currentWidth) return
+    const delta = event.key === 'ArrowLeft' ? 20 : -20
+    resizeDrawer(stageBounds.right - currentWidth - delta)
   }
 
   function retryStorageLoad() {
@@ -251,7 +355,7 @@ function App() {
 
   return (
     <div className="notebook">
-      <aside className="sidebar">
+      <aside id="sidebar-panel" className={`sidebar${isSidebarOpen ? ' sidebar--open' : ''}`} aria-hidden={!isSidebarOpen} inert={!isSidebarOpen}>
         <a className="sidebar__brand" href="#main-content">
           <span className="sidebar__brand-mark" aria-hidden="true">GM</span>
           <span className="sidebar__brand-name">Game Master<span>Notebook</span></span>
@@ -259,16 +363,32 @@ function App() {
         <div className="sidebar__tools">
           <label className="sidebar__search">
             <span className="sidebar__search-icon" aria-hidden="true">/</span>
-            <input className="sidebar__search-input" type="search" placeholder="Szukaj notatek" aria-label="Szukaj notatek" />
+            <input ref={searchInputRef} className="sidebar__search-input" type="search" placeholder="Szukaj notatek" aria-label="Szukaj notatek" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
             <kbd className="sidebar__search-shortcut">Ctrl K</kbd>
           </label>
           <button className="sidebar__action sidebar__action--primary" type="button" onClick={() => openDialog({ kind: 'node', parentId: selectedId || tree.id, value: '' })}><span className="sidebar__action-icon" aria-hidden="true">+</span> Nowa notatka</button>
         </div>
+        {searchQuery.trim() && <section className="sidebar__results" aria-label="Wyniki wyszukiwania">
+          {searchResults.length > 0 ? searchResults.map(({ node, path }) => (
+            <button className="sidebar__result" key={node.id} type="button" onClick={() => selectSearchResult(node)}>
+              <span className="sidebar__result-name">{node.name}</span>
+              <span className="sidebar__result-path">{path.slice(0, -1).join(' / ')}</span>
+            </button>
+          )) : <p className="sidebar__no-results">Nie znaleziono notatek</p>}
+        </section>}
       </aside>
       <main className="workspace" id="main-content">
         <section className="graph-view">
           <header className="graph-view__header">
-            <div className="graph-view__heading"><span>NOTATNIK KAMPANII</span><h1>Mapa notatek</h1></div>
+            <button
+              className="graph-view__menu-toggle"
+              type="button"
+              aria-label={isSidebarOpen ? 'Zamknij panel boczny' : 'Otworz panel boczny'}
+              aria-expanded={isSidebarOpen}
+              aria-controls="sidebar-panel"
+              title={isSidebarOpen ? 'Zamknij panel boczny' : 'Otworz panel boczny'}
+              onClick={() => setIsSidebarOpen((open) => !open)}
+            ><span className="graph-view__menu-icon" aria-hidden="true"><i /><i /><i /></span></button>
             <div className="graph-view__status-actions">
               <span className={`graph-view__save-status graph-view__save-status--${storageStatus}`} aria-live="polite">
                 {storageStatus === 'loading' || storageStatus === 'load-error' ? 'Wczytywanie...' : storageStatus === 'saving' ? 'Zapisywanie...' : storageStatus === 'error' ? 'Blad zapisu' : 'Zapisano lokalnie'}
@@ -276,20 +396,41 @@ function App() {
               {storageStatus === 'error' && <button className="graph-view__retry" type="button" onClick={() => setSaveRetry((retry) => retry + 1)}>Ponow zapis</button>}
             </div>
           </header>
-          <div className={`graph-view__stage${noteNode ? ' graph-view__stage--with-drawer' : ''}`}>
+          <div
+            ref={stageRef}
+            className={`graph-view__stage${noteNode ? ' graph-view__stage--with-drawer' : ''}${isResizingDrawer ? ' graph-view__stage--resizing' : ''}`}
+            style={drawerWidthPercent === null ? undefined : { '--drawer-width': `${drawerWidthPercent}%` } as CSSProperties}
+          >
             <div className="graph-view__canvas">
               <TreeGraph
                 tree={tree}
                 selectedId={selectedId}
                 collapsedIds={collapsedIds}
                 onSelectNode={setSelectedId}
-                onToggleNode={(id) => setCollapsedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id])}
-                onAddChild={(node) => openDialog({ kind: 'node', parentId: node.id, value: '' })}
-                onRename={(node) => openDialog({ kind: 'rename', nodeId: node.id, value: node.name })}
-                onRemove={(node) => openDialog({ kind: 'delete', nodeId: node.id, value: node.name })}
+                onToggleNode={handleToggleNode}
+                onAddChild={handleAddChild}
+                onRename={handleRename}
+                onRemove={handleRemove}
+                onMoveNode={handleMoveNode}
               />
             </div>
-            <aside className={`note-drawer${noteNode ? ' note-drawer--open' : ''}`} aria-hidden={!noteNode}>
+            <aside ref={drawerRef} className={`note-drawer${noteNode ? ' note-drawer--open' : ''}`} aria-hidden={!noteNode} inert={!noteNode}>
+              <div
+                className="note-drawer__resize-handle"
+                role="separator"
+                aria-label="Zmien szerokosc panelu notatki"
+                aria-orientation="vertical"
+                aria-valuenow={drawerWidthPercent === null ? 46 : Math.round(drawerWidthPercent)}
+                aria-valuemin={45}
+                aria-valuemax={82}
+                tabIndex={0}
+                onPointerDown={handleDrawerResizeStart}
+                onPointerMove={handleDrawerResizeMove}
+                onPointerUp={handleDrawerResizeEnd}
+                onPointerCancel={handleDrawerResizeEnd}
+                onLostPointerCapture={handleDrawerResizeEnd}
+                onKeyDown={handleDrawerResizeKeyDown}
+              />
               {noteNode && <>
                 <header className="note-drawer__header">
                   <nav className="note-drawer__breadcrumbs" aria-label="Sciezka notatki">
@@ -318,6 +459,7 @@ function App() {
           </div>
         </section>
       </main>
+      {isSidebarOpen && <button className="sidebar-backdrop" type="button" aria-label="Zamknij panel boczny" onClick={() => setIsSidebarOpen(false)} />}
       {dialog && <div className="dialog__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null) }}>
         <form className="dialog__form" role="dialog" aria-modal="true" aria-labelledby="dialog-title" onSubmit={submitDialog}>
           <h2 className="dialog__title" id="dialog-title">{dialog.kind === 'node' ? 'Nowa notatka' : dialog.kind === 'rename' ? 'Zmien nazwe' : 'Usun element?'}</h2>

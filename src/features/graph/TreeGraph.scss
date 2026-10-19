@@ -1,5 +1,12 @@
 @use '../../styles/tokens' as tokens;
 
+.tree-graph__interaction-layer {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
 .react-flow__node-notebookNode {
   width: 226px;
   padding: 0;
@@ -72,6 +79,11 @@
     box-shadow: var(--shadow-node);
     transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 
+    &--drop-target {
+      border-color: var(--color-accent-strong);
+      box-shadow: 0 0 0 3px var(--color-accent-focus), var(--shadow-node-hover);
+    }
+
     &:hover {
       transform: translateY(-1px);
       border-color: var(--color-accent-strong);
@@ -123,6 +135,20 @@
     color: var(--color-warning);
     font-size: 16px;
     text-align: center;
+  }
+
+  &__drag-preview {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    width: 226px;
+    min-height: 54px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    transform: translate(-50%, -50%);
+    opacity: 0.92;
+    pointer-events: none;
   }
 
   &__node-label {
